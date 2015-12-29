@@ -368,6 +368,9 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             upsync_timeout = ngx_parse_time(&s, 0);
             if (upsync_timeout == (time_t) NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "upsync_server: invalid parameter \"%V\"", 
+                                   &value[i]);
                 goto invalid;
             }
 
@@ -381,6 +384,9 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             upsync_interval = ngx_parse_time(&s, 0);
             if (upsync_interval == (time_t) NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "upsync_server: invalid parameter \"%V\"", 
+                                   &value[i]);
                 goto invalid;
             }
 
@@ -412,6 +418,8 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             upscf->upsync_type_conf = ngx_http_get_upsync_type_conf(&s);
             if (upscf->upsync_type_conf == NULL) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "upsync_server: upsync_type invalid para");
                 goto invalid;
             }
 
@@ -430,13 +438,18 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (strong_dependency != 0) {
         upscf->strong_dependency = strong_dependency;
     }
+    if (upscf->upsync_type_conf == NGX_CONF_UNSET_PTR) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "upsync_server: upsync_type cannt be null");
+        goto invalid;
+    }
 
     ngx_memzero(&u, sizeof(ngx_url_t));
 
     p = (u_char *)ngx_strchr(value[1].data, '/');
     if (p == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "upsync_consul_server: "
+                           "upsync_server: "
                            "please input conf_server upstream key in upstream");
         return NGX_CONF_ERROR;
     }
@@ -454,8 +467,7 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         upscf->upsync_port = ngx_atoi(p + 1, upscf->upsync_send.data - p - 1);
         if (upscf->upsync_port < 1 || upscf->upsync_port > 65535) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "upsync_consul_server: "
-                               "conf server port is invalid");
+                               "upsync_server: server port is invalid");
             return NGX_CONF_ERROR;
         }
 
@@ -470,7 +482,7 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (ngx_parse_url(cf->pool, &u) != NGX_OK) {
         if (u.err) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "upsync_consul_server: "
+                               "upsync_server: "
                                "%s in upstream \"%V\"", u.err, &u.url);
         }
         return NGX_CONF_ERROR;
@@ -486,10 +498,6 @@ ngx_http_upsync_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 
 invalid:
-
-    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "upsync_consul_server: "
-                       "conf_server invalid parameter \"%V\"", &value[i]);
 
     return NGX_CONF_ERROR;
 }
