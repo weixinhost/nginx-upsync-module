@@ -1213,6 +1213,7 @@ ngx_http_upsync_parse_json(void *data)
             upstream_conf->backup = (ngx_uint_t)backup;
         }
 
+        max_fails = 2, backup = 0, down = 0;
     }
     cJSON_Delete(root);
 
@@ -1935,6 +1936,13 @@ ngx_http_upsync_parse_dump_file(ngx_http_upsync_server_t *upsync_server)
                 continue;
             }
 
+            if (ngx_strncmp(prev, "down", 4) == 0) {
+                upstream_conf->down = 1;
+
+                prev += 4;
+                continue;
+            }
+
             prev++;
         }
     }
@@ -2350,14 +2358,20 @@ ngx_http_upsync_dump_server(ngx_http_upsync_server_t *upsync_server)
     }
 
     for (peer = peers->peer; peer; peer = peer->next) {
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
                                "server %V", &peer->name);
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
                                " weight=%d", peer->weight);
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
                                " max_fails=%d", peer->max_fails);
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
-                               " fail_timeout=%ds;\n", peer->fail_timeout);
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
+                               " fail_timeout=%ds", peer->fail_timeout);
+
+        if (peers->peer[i].down) {
+            b->last = ngx_snprintf(b->last, b->end - b->last, " down");
+        }
+ 
+        b->last = ngx_snprintf(b->last, b->end - b->last, ";\n");
     }
 
     upscf = upsync_server->upscf;
@@ -3230,20 +3244,26 @@ ngx_http_upsync_show(ngx_http_request_t *r)
         peers = (ngx_http_upstream_rr_peers_t *)uscf->peer.data;
     }
 
-    b->last = ngx_snprintf(b->last,b->end - b->last, 
+    b->last = ngx_snprintf(b->last, b->end - b->last, 
                            "Upstream name: %V;", host);
-    b->last = ngx_snprintf(b->last,b->end - b->last, 
+    b->last = ngx_snprintf(b->last, b->end - b->last, 
                            "Backend server counts: %d\n", peers->number);
 
     for (peer = peers->peer; peer; peer = peer->next) {
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
                                "        server %V", &peer->name);
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
                                " weight=%d", peer->weight);
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
                                " max_fails=%d", peer->max_fails);
-        b->last = ngx_snprintf(b->last,b->end - b->last, 
-                               " fail_timeout=%d;\n", peer->fail_timeout);
+        b->last = ngx_snprintf(b->last, b->end - b->last, 
+                               " fail_timeout=%ds", peer->fail_timeout);
+
+        if (peers->peer[i].down) {
+            b->last = ngx_snprintf(b->last, b->end - b->last, " down");
+        }
+
+        b->last = ngx_snprintf(b->last, b->end - b->last, ";\n");
     }
 
 end:
