@@ -1024,7 +1024,7 @@ static ngx_int_t
 ngx_http_upsync_parse_json(void *data)
 {
 
-    u_char                          *p;
+  //  u_char                          *p;
     ngx_buf_t                       *buf;
     ngx_http_upsync_ctx_t          *ctx;
     ngx_http_upsync_conf_t         *upstream_conf = NULL;
@@ -1051,19 +1051,21 @@ ngx_http_upsync_parse_json(void *data)
     for (server_next = root->child; server_next != NULL; 
             server_next = server_next->next) {
 
-        cJSON *temp1 = cJSON_GetObjectItem(server_next, "ServiceID");
-
-        if (temp1 != NULL && temp1->valuestring != NULL) {
-            p = (u_char *)ngx_strchr(temp1->valuestring, ':') + 1;
-
-            if (ngx_http_upsync_check_key(p) != NGX_OK) {
+        cJSON *temp1 = cJSON_GetObjectItem(server_next, "ServiceAddress");
+        cJSON *temp2 = cJSON_GetObjectItem(server_next, "ServicePort");
+        if (temp1 != NULL && temp1->valuestring != NULL && temp2->valueint != 0) {
+            char parsed_addr[64] = {0};
+            sprintf(parsed_addr,"%s:%d",(char *)temp1->valuestring,(int)temp2->valueint);
+            if (ngx_http_upsync_check_key((u_char*)parsed_addr) != NGX_OK) {
                 continue;
             }
-
             upstream_conf = ngx_array_push(&ctx->upstream_conf);
             ngx_memzero(upstream_conf, sizeof(*upstream_conf));
-            ngx_sprintf(upstream_conf->sockaddr, "%*s", ngx_strlen(p), p);
+            ngx_sprintf(upstream_conf->sockaddr, "%*s", strlen(parsed_addr), parsed_addr);
         }
+        upstream_conf->weight = 1;
+        upstream_conf->fail_timeout = 5000;
+        upstream_conf->max_fails = 5;
     }
     cJSON_Delete(root);
 
@@ -1207,6 +1209,8 @@ ngx_http_upsync_addrs(ngx_pool_t *pool, u_char *sockaddr, ngx_flag_t flag)
         return NULL;
     }
 
+
+    /*
     char host_str[1024] = {0};
     memcpy(host_str,p,port_p - p);
     struct hostent *host = gethostbyname((const char *)host_str);
@@ -1215,12 +1219,12 @@ ngx_http_upsync_addrs(ngx_pool_t *pool, u_char *sockaddr, ngx_flag_t flag)
                       "upsync_addrs: gethostbyname error in %s", host_str);
         return NULL;
     }
-
     char ip_str[32] = {0};
     inet_ntop(host->h_addrtype, host->h_addr, ip_str, sizeof(ip_str));
+     */
     sin->sin_family = AF_INET;
     sin->sin_port = htons((in_port_t) port);
-    sin->sin_addr.s_addr = ngx_inet_addr((u_char *)ip_str, strlen(ip_str));
+    sin->sin_addr.s_addr = ngx_inet_addr(p, port_p - p);
     if (sin->sin_addr.s_addr == INADDR_NONE) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, 
                       "upsync_addrs: invalid ip in %s", p);
@@ -1230,6 +1234,8 @@ ngx_http_upsync_addrs(ngx_pool_t *pool, u_char *sockaddr, ngx_flag_t flag)
         }
         return NULL;
     }
+
+
 
     addrs = ngx_pcalloc(pool, sizeof(ngx_addr_t));
     if (addrs == NULL) {
