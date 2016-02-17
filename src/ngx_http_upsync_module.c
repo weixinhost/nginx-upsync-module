@@ -1064,9 +1064,10 @@ ngx_http_upsync_parse_json(void *data)
             ngx_sprintf(upstream_conf->sockaddr, "%*s", strlen(parsed_addr), parsed_addr);
         }
         upstream_conf->weight = 1;
-        upstream_conf->fail_timeout = 5000;
-        upstream_conf->max_fails = 5;
+        upstream_conf->fail_timeout = 10;
+        upstream_conf->max_fails = 3;
     }
+
     cJSON_Delete(root);
 
     return NGX_OK;
